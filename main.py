@@ -18,18 +18,65 @@ headers = {
 
 
 # 网络请求函数
-def get_course(jx0404id, kcid):
-    # 抢课
+def login(username, password):
+    # 登录
     global cookie, headers
 
-    url = "http://jwxt.njfu.edu.cn/jsxsd/xsxkkc/ggxxkxkOper"
-    data = {"jx0404id": jx0404id, "xkzy": "", "trjf": "", "kcid": kcid, "cfbs": ""}
+    login_headers = headers.copy()
+    login_headers["Referer"] = "http://jwxt.njfu.edu.cn/jsxsd/xk"
 
-    r = requests.post(url=url, data=data, cookies=cookie)
+    url = "http://jwxt.njfu.edu.cn/jsxsd/xk/LoginToXk"  # 三个登录接口之一,应该是最简单的了吧
+    data = {
+        "loginMethod": "LoginToXk",
+        "userAccount": username,
+        "userPassword": "",
+        "encoded": base64.b64encode(username.encode()).decode()
+        + "%%%"
+        + base64.b64encode(password.encode()).decode(),  # 逆天加密(
+    }
+
+    # 随便访问一个获取cookie
+    cookie = requests.get(
+        url="http://jwxt.njfu.edu.cn/jsxsd/xk", headers=login_headers
+    ).cookies
+
+    r = requests.post(url=url, data=data, headers=login_headers, cookies=cookie)
+
     if r.status_code != 200:
-        raise requests.RequestException("选课失败")
+        return False
+    return True
 
-    return r
+
+def get_course_list_id():
+    # 获取选课id
+    global cookie, headers
+
+    url = "http://jwxt.njfu.edu.cn/jsxsd/xsxk/xklc_list"
+    r = requests.get(url=url, cookies=cookie, headers=headers)
+    text = r.text
+
+    if r.status_code != 200:
+        raise requests.RequestException("获取选课id失败")
+
+    # 解析表格
+    try:
+        sp = bs4.BeautifulSoup(text, "html.parser")
+        t = sp.find("table", id="attend_class").find_all("tr")[1:]
+        if len(t) > 1:
+            name_list = []
+            id_list = []
+
+            for i in t:
+                name_list.append(i.find_all("td")[1].text)
+                id_list.append(i.find("a").attrs["onclick"].split("'")[1])
+
+            return id_list[selector(name_list)]  # >1个需要用户选择
+
+        elif len(t) == 1:
+            return t[0].find("a").attrs["onclick"].split("'")[1]
+
+    except Exception as e:
+        return False
 
 
 def get_course_ids(courseinfo):
@@ -99,65 +146,18 @@ def get_course_ids(courseinfo):
     return [jx0404id, ckid, name]
 
 
-def login(username, password):
-    # 登录
+def get_course(jx0404id, kcid):
+    # 抢课
     global cookie, headers
 
-    login_headers = headers.copy()
-    login_headers["Referer"] = "http://jwxt.njfu.edu.cn/jsxsd/xk"
+    url = "http://jwxt.njfu.edu.cn/jsxsd/xsxkkc/ggxxkxkOper"
+    data = {"jx0404id": jx0404id, "xkzy": "", "trjf": "", "kcid": kcid, "cfbs": ""}
 
-    url = "http://jwxt.njfu.edu.cn/jsxsd/xk/LoginToXk"  # 三个登录接口之一,应该是最简单的了吧
-    data = {
-        "loginMethod": "LoginToXk",
-        "userAccount": username,
-        "userPassword": "",
-        "encoded": base64.b64encode(username.encode()).decode()
-        + "%%%"
-        + base64.b64encode(password.encode()).decode(),  # 逆天加密(
-    }
-
-    # 随便访问一个获取cookie
-    cookie = requests.get(
-        url="http://jwxt.njfu.edu.cn/jsxsd/xk", headers=login_headers
-    ).cookies
-
-    r = requests.post(url=url, data=data, headers=login_headers, cookies=cookie)
-
+    r = requests.post(url=url, data=data, cookies=cookie)
     if r.status_code != 200:
-        return False
-    return True
+        raise requests.RequestException("选课失败")
 
-
-def get_course_list_id():
-    # 获取选课id
-    global cookie, headers
-
-    url = "http://jwxt.njfu.edu.cn/jsxsd/xsxk/xklc_list"
-    r = requests.get(url=url, cookies=cookie, headers=headers)
-    text = r.text
-
-    if r.status_code != 200:
-        raise requests.RequestException("获取选课id失败")
-
-    # 解析表格
-    try:
-        sp = bs4.BeautifulSoup(text, "html.parser")
-        t = sp.find("table", id="attend_class").find_all("tr")[1:]
-        if len(t) > 1:
-            name_list = []
-            id_list = []
-
-            for i in t:
-                name_list.append(i.find_all("td")[1].text)
-                id_list.append(i.find("a").attrs["onclick"].split("'")[1])
-
-            return id_list[selector(name_list)]  # >1个需要用户选择
-
-        elif len(t) == 1:
-            return t[0].find("a").attrs["onclick"].split("'")[1]
-
-    except Exception as e:
-        return False
+    return r
 
 
 def enter_selection(course_list_id):
