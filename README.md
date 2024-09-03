@@ -5,3 +5,7 @@
 
 >[!WARNING]
 >该项目仍在开发中，可能存在bug，请谨慎使用
+
+## 依赖
+- requests
+- beautifulsoup
