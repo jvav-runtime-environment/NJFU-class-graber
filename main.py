@@ -52,7 +52,7 @@ def get_course_ids(courseinfo):
         "iColumns": 13,
         "sColumns": "",
         "iDisplayStart": 0,
-        "iDisplayLength": 15,
+        "iDisplayLength": 999,
         "mDataProp_0": "kch",
         "mDataProp_1": "kcmc",
         "mDataProp_2": "xf",
@@ -140,20 +140,24 @@ def get_course_list_id():
         raise requests.RequestException("获取选课id失败")
 
     # 解析表格
-    sp = bs4.BeautifulSoup(text, "html.parser")
-    t = sp.find("table", id="attend_class").find_all("tr")[1:]
-    if len(t) > 1:
-        name_list = []
-        id_list = []
+    try:
+        sp = bs4.BeautifulSoup(text, "html.parser")
+        t = sp.find("table", id="attend_class").find_all("tr")[1:]
+        if len(t) > 1:
+            name_list = []
+            id_list = []
 
-        for i in t:
-            name_list.append(i.find_all("td")[1].text)
-            id_list.append(i.find("a").attrs["onclick"].split("'")[1])
+            for i in t:
+                name_list.append(i.find_all("td")[1].text)
+                id_list.append(i.find("a").attrs["onclick"].split("'")[1])
 
-        return id_list[selector(name_list)]  # >1个需要用户选择
+            return id_list[selector(name_list)]  # >1个需要用户选择
 
-    elif len(t) == 1:
-        return t[0].find("a").attrs["onclick"].split("'")[1]
+        elif len(t) == 1:
+            return t[0].find("a").attrs["onclick"].split("'")[1]
+
+    except Exception as e:
+        return False
 
 
 def enter_selection(course_list_id):
@@ -230,6 +234,7 @@ while True:
             if course_list_id:
                 break
 
+            print("获取选课列表id失败, 重试中...")
             time.sleep(delay * 5)
 
         print(f"获取选课列表成功!选课列表id: {course_list_id}")
