@@ -4,11 +4,13 @@ import base64
 import time
 import bs4
 
-cookie = None
+
 username = None
 password = None
 delay = 0.3
 
+
+cookie = None
 headers = {
     "Host": "jwxt.njfu.edu.cn",
     "Origin": "http://jwxt.njfu.edu.cn",
@@ -262,16 +264,18 @@ while True:
             for j in range(3):  # 尝试3次
                 try:
                     r = get_course(jx0404id, ckid)
+
+                    rtext = json.loads(r.text)
+                    if rtext["success"]:
+                        print(f"课程 {name} 选课成功")
+                    else:
+                        print(f"课程 {name} 选课失败, 原因: {rtext['message']}")
+
                     break
+
                 except requests.RequestException:
                     print(f"抢课失败, 重试中...({j+1}/3)")
                     time.sleep(delay)
-
-            rtext = json.loads(r.text)
-            if rtext["success"]:
-                print(f"课程 {name} 选课成功")
-            else:
-                print(f"课程 {name} 选课失败, 原因: {rtext['message']}")
 
             time.sleep(delay)
 
