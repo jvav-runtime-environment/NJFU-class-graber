@@ -9,6 +9,13 @@ username = None
 password = None
 delay = 0.3
 
+safe_mode = True
+# 该选项控制是否启用安全模式,
+# 即在仅有一个选项的情况下会询问用户是否选择
+# 避免误抢发生
+# 当然开启这个选项会要求用户输入导致抢课速度变慢
+# 视情况自行选择是否使用
+
 
 cookie = None
 headers = {
@@ -38,9 +45,7 @@ def login(username, password):
     }
 
     # 随便访问一个获取cookie
-    cookie = requests.get(
-        url="http://jwxt.njfu.edu.cn/jsxsd/xk", headers=login_headers
-    ).cookies
+    cookie = requests.get("http://jwxt.njfu.edu.cn/jsxsd/xk", headers=headers).cookies
 
     r = requests.post(url=url, data=data, headers=login_headers, cookies=cookie)
 
@@ -67,18 +72,15 @@ def get_course_list_id():
     try:
         sp = bs4.BeautifulSoup(text, "html.parser")
         t = sp.find("table", id="attend_class").find_all("tr")[1:]
-        if len(t) > 1:
-            name_list = []
-            id_list = []
 
-            for i in t:
-                name_list.append(i.find_all("td")[1].text)
-                id_list.append(i.find("a").attrs["onclick"].split("'")[1])
+        name_list = []
+        id_list = []
 
-            return id_list[selector(name_list)]  # >1个需要用户选择
+        for i in t:
+            name_list.append(i.find_all("td")[1].text)
+            id_list.append(i.find("a").attrs["onclick"].split("'")[1])
 
-        elif len(t) == 1:
-            return t[0].find("a").attrs["onclick"].split("'")[1]
+        return id_list[selector(name_list)]
 
     except Exception as e:
         return False
@@ -129,26 +131,18 @@ def get_course_ids(courseinfo):
         raise requests.exceptions.InvalidSchema("没有找到该课程")
 
     elif course_info["iTotalRecords"] > 1:
-        # 多于一个课程需要选择
         print("找到多个课程")
 
-        name_list = []
-        ids_list = []
+    name_list = []
+    ids_list = []
 
-        for i in course_info["aaData"]:
-            name_list.append(i["kcmc"])
-            ids_list.append([i["jx0404id"], i["jx02id"]])
+    for i in course_info["aaData"]:
+        name_list.append(i["kcmc"])
+        ids_list.append([i["jx0404id"], i["jx02id"]])
 
-        index = selector(name_list)
+    index = selector(name_list)
 
-        return ids_list[index] + name_list[index]
-
-    else:
-        jx0404id = course_info["aaData"][0]["jx0404id"]
-        ckid = course_info["aaData"][0]["jx02id"]
-        name = course_info["aaData"][0]["kcmc"]
-
-    return [jx0404id, ckid, name]
+    return ids_list[index] + [name_list[index]]
 
 
 def get_course(jx0404id, kcid):
@@ -187,22 +181,34 @@ def exit_selection():
 
 # 功能函数
 def selector(list_):
-    print("请选择,并输入选择的序号:")
-    for i in range(1, len(list_) + 1):
-        print(f"[{i}]:\t{list_[i-1]}")
+    if len(list_) == 1 and safe_mode:  # 安全模式下即使就一个选项也需要询问
+        if comfirm(list_[0]):
+            return 0
 
-    while True:
-        try:
-            index = int(input("你选择的序号:")) - 1
-        except ValueError:
-            print("输入错误, 请重新输入")
-            continue
+    elif len(list_) > 1:
+        print("请选择,并输入选择的序号:")
+        for i in range(1, len(list_) + 1):
+            print(f"[{i}]:\t{list_[i-1]}")
 
-        if index < 0 or index >= len(list_):
-            print("输入错误, 请重新输入")
-            continue
+        while True:
+            try:
+                index = int(input("你选择的序号:")) - 1
+            except ValueError:
+                print("输入错误, 请重新输入")
+                continue
 
-        return index
+            if index < 0 or index >= len(list_):
+                print("输入错误, 请重新输入")
+                continue
+
+            return index
+
+
+def comfirm(item):
+    a = input(f"请确认选择 <{item}> ?(enter键确认, 其他取消): ")
+    if a == "":
+        return True
+    return False
 
 
 while True:
@@ -228,7 +234,7 @@ while True:
             )
 
             if course == "q":
-                print(f"当前备选列表{courses},确认退出？(y/n): ", end="")
+                print(f"当前备选列表{courses}, 确认退出？(y/n): ", end="")
                 if input() == "y":
                     break
                 else:
@@ -243,21 +249,35 @@ while True:
 
         print("获取选课列表id中...")
         while True:
-            course_list_id = get_course_list_id()
+            try:
+                course_list_id = get_course_list_id()
+            except TypeError:  # 如果没有确认对应的选课列表
+                print("刷新选课列表...")
+
             if course_list_id:
                 break
 
             print("获取选课列表id失败, 重试中...")
             time.sleep(delay * 5)
 
-        print(f"获取选课列表成功!选课列表id: {course_list_id}")
+        print(f"获取选课列表成功! 选课列表id: {course_list_id}")
         print("模拟进入选课中...")
         enter_selection(course_list_id)
         time.sleep(delay)
 
         for i in courses:
-            print("获取课程信息...")
-            jx0404id, ckid, name = get_course_ids(i)
+            print("正在查询课程信息...")
+            try:
+                jx0404id, ckid, name = get_course_ids(i)
+
+            except TypeError:
+                print("已取消选择, 切换下一门课程...")
+                continue
+
+            except requests.exceptions.InvalidSchema:
+                print("未找到对应的课程, 切换下一门课程...")
+                continue
+
             print(f"id: {jx0404id}, 课程id: {ckid}, 课程名: {name}")
 
             print("正在抢课...")
@@ -267,19 +287,21 @@ while True:
 
                     rtext = json.loads(r.text)
                     if rtext["success"]:
-                        print(f"课程 {name} 选课成功")
+                        print(f"课程 {name} 抢课成功")
                     else:
-                        print(f"课程 {name} 选课失败, 原因: {rtext['message']}")
+                        print(f"课程 {name} 抢课失败, 原因: {rtext['message']}")
 
                     break
 
                 except requests.RequestException:
                     print(f"抢课失败, 重试中...({j+1}/3)")
+                    if j == 2:
+                        print(f"课程 {name} 抢课失败, 切换下一门课程...")
                     time.sleep(delay)
 
             time.sleep(delay)
 
-        print("选课完成!")
+        print("抢课完成!")
         exit_selection()
         break
 
