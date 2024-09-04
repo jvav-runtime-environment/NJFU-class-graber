@@ -207,7 +207,7 @@ while True:
     while True:
         if username is None or password is None:
             username = input("请输入学号: ")
-            password = input("请输入密码: ")
+            password = input("请输入密码(带特殊符号和大小写的): ")
 
         print("登录中...")
         if login(username, password):
