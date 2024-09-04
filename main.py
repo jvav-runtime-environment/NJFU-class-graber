@@ -43,6 +43,9 @@ def login(username, password):
     r = requests.post(url=url, data=data, headers=login_headers, cookies=cookie)
 
     if r.status_code != 200:
+        raise requests.RequestException("登录失败")
+
+    if "账号不存在或密码错误" in r.text:
         return False
     return True
 
@@ -202,15 +205,18 @@ def selector(list_):
 
 while True:
     while True:
-        username = input("请输入学号: ")
-        password = input("请输入密码: ")
-        print("登录中...")
+        if username is None or password is None:
+            username = input("请输入学号: ")
+            password = input("请输入密码: ")
 
+        print("登录中...")
         if login(username, password):
             print("登录成功")
             break
         else:
             print("登录失败,请重试")
+            username = None
+            password = None
 
     try:
         courses = []
@@ -248,7 +254,13 @@ while True:
             print(f"id: {jx0404id}, 课程id: {ckid}, 课程名: {name}")
 
             print("正在抢课...")
-            r = get_course(jx0404id, ckid)
+            for j in range(3):  # 尝试3次
+                try:
+                    r = get_course(jx0404id, ckid)
+                    break
+                except requests.RequestException:
+                    print(f"抢课失败, 重试中...({j+1}/3)")
+                    time.sleep(delay)
 
             rtext = json.loads(r.text)
             if rtext["success"]:
@@ -263,5 +275,5 @@ while True:
         break
 
     except requests.RequestException as e:
-        print(f"发生链接错误: {e}")
+        print(f"发生连接错误: {e}")
         print("重新登录...")
