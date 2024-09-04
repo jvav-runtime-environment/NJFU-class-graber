@@ -211,6 +211,11 @@ def comfirm(item):
     return False
 
 
+print("--------------------------------------------------------\n")
+print("南京林业大学新教务系统自动抢课工具v1.0\n")
+print("authored by jvav-runtime-environment\n")
+print("--------------------------------------------------------\n")
+
 while True:
     while True:
         if username is None or password is None:
