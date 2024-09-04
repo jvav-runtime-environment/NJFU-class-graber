@@ -234,6 +234,11 @@ while True:
 
             courses.append(course)
 
+        print("\n--------------------------")
+        print("准备工作完成!")
+        input("按回车键开始抢课...")
+        print("--------------------------\n")
+
         print("获取选课列表id中...")
         while True:
             course_list_id = get_course_list_id()
