@@ -181,8 +181,11 @@ def exit_selection():
 
 # 功能函数
 def selector(list_):
-    if len(list_) == 1 and safe_mode:  # 安全模式下即使就一个选项也需要询问
-        if comfirm(list_[0]):
+    if len(list_) == 1:
+        if not safe_mode:  # 安全模式下即使就一个选项也需要询问
+            return 0
+
+        elif comfirm(list_[0]):
             return 0
 
     elif len(list_) > 1:
