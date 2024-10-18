@@ -1,8 +1,9 @@
 import requests
 import json
-import base64
 import time
 import bs4
+import os
+from login import uia_login
 
 
 username = None
@@ -31,29 +32,12 @@ def login(username, password):
     # 登录
     global cookie, headers
 
-    login_headers = headers.copy()
-    login_headers["Referer"] = "http://jwxt.njfu.edu.cn/jsxsd/xk"
-
-    url = "http://jwxt.njfu.edu.cn/jsxsd/xk/LoginToXk"  # 三个登录接口之一,应该是最简单的了吧
-    data = {
-        "loginMethod": "LoginToXk",
-        "userAccount": username,
-        "userPassword": "",
-        "encoded": base64.b64encode(username.encode()).decode()
-        + "%%%"
-        + base64.b64encode(password.encode()).decode(),  # 逆天加密(
-    }
-
-    # 随便访问一个获取cookie
-    cookie = requests.get("http://jwxt.njfu.edu.cn/jsxsd/xk", headers=headers).cookies
-
-    r = requests.post(url=url, data=data, headers=login_headers, cookies=cookie)
-
-    if r.status_code != 200:
-        raise requests.RequestException("登录失败")
-
-    if "账号不存在或密码错误" in r.text:
+    try:
+        cookie = uia_login(username, password)
+    except Exception as e:
+        print(e)
         return False
+
     return True
 
 
@@ -215,19 +199,42 @@ def comfirm(item):
 
 
 print("--------------------------------------------------------\n")
-print("南京林业大学新教务系统自动抢课工具v1.0\n")
+print("南京林业大学新教务系统自动抢课工具v1.1\n")
 print("authored by jvav-runtime-environment\n")
 print("--------------------------------------------------------\n")
+
+if os.path.isfile("data.json"):
+    with open("data.json", "r") as f:
+        data = json.load(f)
+        username = data["username"]
+        password = data["password"]
+        safe_mode = data["safe_mode"]
+
+else:
+    with open("data.json", "w") as f:
+        json.dump({"username": None, "password": None, "safe_mode": True}, f)
+
 
 while True:
     while True:
         if username is None or password is None:
-            username = input("请输入学号: ")
-            password = input("请输入密码(带特殊符号和大小写的): ")
+            username = input("请输入uia账号: ")
+            password = input("请输入uia密码: ")
 
         print("登录中...")
-        if login(username, password):
+        if uia_login(username, password):
             print("登录成功")
+
+            with open("data.json", "w") as f:
+                json.dump(
+                    {
+                        "username": username,
+                        "password": password,
+                        "safe_mode": safe_mode,
+                    },
+                    f,
+                )
+
             break
         else:
             print("登录失败,请重试")
@@ -237,9 +244,7 @@ while True:
     try:
         courses = []
         while True:
-            course = input(
-                "请输入备选课程名(id也行但是可能出多个结果)(重要课程优先输入)(输入q结束): "
-            )
+            course = input("请输入备选课程id(重要课程优先输入)(输入q结束): ")
 
             if course == "q":
                 print(f"当前备选列表{courses}, 确认退出？(y/n): ", end="")
@@ -252,8 +257,9 @@ while True:
 
         print("\n--------------------------")
         print("准备工作完成!")
-        input("按回车键开始抢课...")
+        print("按回车键开始抢课...")
         print("--------------------------\n")
+        input()
 
         print("获取选课列表id中...")
         while True:
