@@ -47,14 +47,13 @@ def get_course_list_id():
 
     url = "http://jwxt.njfu.edu.cn/jsxsd/xsxk/xklc_list"
     r = requests.get(url=url, cookies=cookie, headers=headers)
-    text = r.text
 
     if r.status_code != 200:
         raise requests.RequestException("获取选课id失败")
 
     # 解析表格
     try:
-        sp = bs4.BeautifulSoup(text, "html.parser")
+        sp = bs4.BeautifulSoup(r.text, "html.parser")
         t = sp.find("table", id="attend_class").find_all("tr")[1:]
 
         name_list = []
@@ -70,7 +69,7 @@ def get_course_list_id():
         return False
 
 
-def get_course_ids(courseinfo):
+def get_course_ids(courseinfo, sec_info):
     # 获取抢课必要的两个id(是不是必要的我不知道,但是他们接口是这么写的)
     global cookie, headers
 
@@ -90,7 +89,7 @@ def get_course_ids(courseinfo):
         "iColumns": 13,
         "sColumns": "",
         "iDisplayStart": 0,
-        "iDisplayLength": 999,
+        "iDisplayLength": 99,
         "mDataProp_0": "kch",
         "mDataProp_1": "kcmc",
         "mDataProp_2": "xf",
@@ -124,7 +123,11 @@ def get_course_ids(courseinfo):
         name_list.append(i["kcmc"])
         ids_list.append([i["jx0404id"], i["jx02id"]])
 
-    index = selector(name_list)
+    # 如果只有一个选项且包含关键字则直接返回
+    if sec_info and (len(course_info["aaData"]) == 1) and (sec_info in r.text):
+        index = 0
+    else:
+        index = selector(name_list)
 
     return ids_list[index] + [name_list[index]]
 
@@ -204,6 +207,7 @@ print("authored by jvav-runtime-environment\n")
 print("--------------------------------------------------------\n")
 
 if os.path.isfile("data.json"):
+    print("检测到配置文件, 读取数据...")
     with open("data.json", "r") as f:
         data = json.load(f)
         username = data["username"]
@@ -222,7 +226,7 @@ while True:
             password = input("请输入uia密码: ")
 
         print("登录中...")
-        if uia_login(username, password):
+        if login(username, password):
             print("登录成功")
 
             with open("data.json", "w") as f:
@@ -245,15 +249,14 @@ while True:
         courses = []
         while True:
             course = input("请输入备选课程id(重要课程优先输入)(输入q结束): ")
-
             if course == "q":
-                print(f"当前备选列表{courses}, 确认退出？(y/n): ", end="")
-                if input() == "y":
+                if input(f"当前备选列表{courses}, 确认退出？(y/n): ") == "y":
                     break
                 else:
                     continue
+            course_sec_info = input("请输入备选课程信息(宁可少填不要错填)(可以留空): ")
 
-            courses.append(course)
+            courses.append([course, course_sec_info])
 
         print("\n--------------------------")
         print("准备工作完成!")
@@ -282,10 +285,10 @@ while True:
         for i in courses:
             print("正在查询课程信息...")
             try:
-                jx0404id, ckid, name = get_course_ids(i)
+                jx0404id, ckid, name = get_course_ids(i[0], i[1])
 
             except TypeError:
-                print("已取消选择, 切换下一门课程...")
+                print("未知格式, 已取消选择, 切换下一门课程...")
                 continue
 
             except requests.exceptions.InvalidSchema:
