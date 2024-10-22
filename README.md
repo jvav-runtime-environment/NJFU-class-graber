@@ -9,3 +9,9 @@
 ## 依赖
 - requests
 - beautifulsoup
+- js2py
+
+## 说明
+- 高版本python报错ssl handshake错误的解决方法可以参考https://blog.csdn.net/dfh00l/article/details/140520710
+- 登录部分单独放在了https://github.com/jvav-runtime-environment/NJFU-uia-auto-login
+- 文件附带了公选课数据接口返回数据结构

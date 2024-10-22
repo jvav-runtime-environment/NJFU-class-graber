@@ -172,6 +172,8 @@ def enter_selection(course_list_id):
 
 def exit_selection():
     # 网页的安全退出，不知道有没有必要..
+    global cookie, headers
+
     requests.get(
         url="http://jwxt.njfu.edu.cn/jsxsd/xsxk/xsxk_exit&jx0404id=1",
         headers=headers,
@@ -285,6 +287,8 @@ while True:
                 course_list_id = get_course_list_id()
             except TypeError:  # 如果没有确认对应的选课列表
                 print("刷新选课列表...")
+            except requests.Timeout:  # 高峰时间波动处理
+                print("获取选课列表id超时, 重试中...")
 
             if course_list_id:
                 break
