@@ -27,6 +27,20 @@ headers = {
 }
 
 
+class Course:
+    def __init__(self, data):
+        if isinstance(data, str):
+            self.raw_text = data
+            self.data = json.loads(data)
+        elif isinstance(data, dict):
+            self.raw_text = json.dumps(data, ensure_ascii=False)
+            self.data = data
+
+        self.name = self.data["kcmc"]
+        self.jx02id = self.data["jx02id"]
+        self.jx0404id = self.data["jx0404id"]
+
+
 # 网络请求函数
 def login(username, password):
     # 登录
@@ -69,7 +83,7 @@ def get_course_list_id():
         return False
 
 
-def get_course_ids(courseinfo, sec_info):
+def get_course_ids(courseinfo, sec_info) -> Course:
     # 获取抢课必要的两个id(是不是必要的我不知道,但是他们接口是这么写的)
     global cookie, headers
 
@@ -116,20 +130,19 @@ def get_course_ids(courseinfo, sec_info):
     elif course_info["iTotalRecords"] > 1:
         print("找到多个课程")
 
-    name_list = []
-    ids_list = []
+    course_list: list[Course] = []
 
     for i in course_info["aaData"]:
-        name_list.append(i["kcmc"])
-        ids_list.append([i["jx0404id"], i["jx02id"]])
+        course_list.append(Course(i))
 
     # 如果只有一个选项且包含关键字则直接返回
-    if sec_info and (len(course_info["aaData"]) == 1) and (sec_info in r.text):
+    if sec_info and (len(course_list) == 1) and (sec_info in course_list[0].raw_text):
+        print("符合第二关键字, 直接选择...")
         index = 0
     else:
-        index = selector(name_list)
+        index = selector([_.name for _ in course_list])
 
-    return ids_list[index] + [name_list[index]]
+    return course_list[index]
 
 
 def get_course(jx0404id, kcid):
@@ -202,7 +215,7 @@ def comfirm(item):
 
 
 print("--------------------------------------------------------\n")
-print("南京林业大学新教务系统自动抢课工具v1.1\n")
+print("南京林业大学新教务系统自动抢课工具v1.3\n")
 print("authored by jvav-runtime-environment\n")
 print("--------------------------------------------------------\n")
 
@@ -221,7 +234,7 @@ else:
 
 while True:
     while True:
-        if username is None or password is None:
+        if not (username and password):
             username = input("请输入uia账号: ")
             password = input("请输入uia密码: ")
 
@@ -254,7 +267,9 @@ while True:
                     break
                 else:
                     continue
-            course_sec_info = input("请输入备选课程信息(宁可少填不要错填)(可以留空): ")
+            course_sec_info = input(
+                "请输入任意备选课程信息(宁可少填不要错填)(可以留空): "
+            )
 
             courses.append([course, course_sec_info])
 
@@ -275,7 +290,7 @@ while True:
                 break
 
             print("获取选课列表id失败, 重试中...")
-            time.sleep(delay * 5)
+            time.sleep(delay * 10)
 
         print(f"获取选课列表成功! 选课列表id: {course_list_id}")
         print("模拟进入选课中...")
@@ -285,7 +300,7 @@ while True:
         for i in courses:
             print("正在查询课程信息...")
             try:
-                jx0404id, ckid, name = get_course_ids(i[0], i[1])
+                course = get_course_ids(i[0], i[1])
 
             except TypeError:
                 print("未知格式, 已取消选择, 切换下一门课程...")
@@ -295,25 +310,27 @@ while True:
                 print("未找到对应的课程, 切换下一门课程...")
                 continue
 
-            print(f"id: {jx0404id}, 课程id: {ckid}, 课程名: {name}")
+            print(
+                f"id: {course.jx0404id}, 课程id: {course.jx02id}, 课程名: {course.name}"
+            )
 
             print("正在抢课...")
             for j in range(3):  # 尝试3次
                 try:
-                    r = get_course(jx0404id, ckid)
+                    r = get_course(course.jx0404id, course.jx02id)
 
                     rtext = json.loads(r.text)
                     if rtext["success"]:
-                        print(f"课程 {name} 抢课成功")
+                        print(f"课程 {course.name} 抢课成功")
                     else:
-                        print(f"课程 {name} 抢课失败, 原因: {rtext['message']}")
+                        print(f"课程 {course.name} 抢课失败, 原因: {rtext['message']}")
 
                     break
 
                 except requests.RequestException:
                     print(f"抢课失败, 重试中...({j+1}/3)")
                     if j == 2:
-                        print(f"课程 {name} 抢课失败, 切换下一门课程...")
+                        print(f"课程 {course.name} 抢课失败, 切换下一门课程...")
                     time.sleep(delay)
 
             time.sleep(delay)
@@ -324,4 +341,8 @@ while True:
 
     except requests.RequestException as e:
         print(f"发生连接错误: {e}")
+        print("重新登录...")
+
+    except Exception as e:
+        print(f"发生未知错误: {e}")
         print("重新登录...")

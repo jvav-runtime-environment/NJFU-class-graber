@@ -72,7 +72,7 @@ def uia_login(username: str, password: str) -> dict | None:
     del s.headers["referer"]
     r = s.get(r.headers["Location"])
 
-    if "教务系统欢迎您！" in r.text:
+    if "选课" in r.text:
         return s.cookies.get_dict()
     else:
         raise Exception("登录失败-未知错误")
